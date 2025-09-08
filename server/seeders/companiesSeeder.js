@@ -6,7 +6,7 @@ dotenv.config();
 
 const companies = [
   {
-    name: 'Google',
+    name: 'Anton Paar',
     industry: 'Technology',
     positions: ['Software Engineer', 'Data Scientist', 'Product Manager', 'UX Designer'],
     description: 'Leading technology company focused on search, cloud computing, and artificial intelligence.',
@@ -18,7 +18,7 @@ const companies = [
     }
   },
   {
-    name: 'Microsoft',
+    name: 'Siemens',
     industry: 'Technology',
     positions: ['Cloud Engineer', 'Software Developer', 'Azure Specialist', 'AI Engineer'],
     description: 'Global technology company developing software, services, devices and solutions.',
@@ -30,7 +30,7 @@ const companies = [
     }
   },
   {
-    name: 'Amazon',
+    name: 'Netconomy',
     industry: 'E-commerce/Cloud',
     positions: ['DevOps Engineer', 'Business Analyst', 'Solutions Architect', 'Operations Manager'],
     description: 'Multinational technology company focusing on e-commerce, cloud computing, and AI.',
@@ -42,7 +42,7 @@ const companies = [
     }
   },
   {
-    name: 'Tesla',
+    name: 'SSI SCHÄFER',
     industry: 'Automotive/Energy',
     positions: ['Mechanical Engineer', 'Software Engineer', 'Battery Engineer', 'Manufacturing Engineer'],
     description: 'Electric vehicle and clean energy company accelerating sustainable transport and energy.',
@@ -54,7 +54,7 @@ const companies = [
     }
   },
   {
-    name: 'Apple',
+    name: 'Beyond Now',
     industry: 'Technology',
     positions: ['iOS Developer', 'Hardware Engineer', 'Machine Learning Engineer', 'Design Engineer'],
     description: 'Technology company that designs and develops consumer electronics and software.',
@@ -66,7 +66,7 @@ const companies = [
     }
   },
   {
-    name: 'Meta',
+    name: 'ÖBB',
     industry: 'Social Media/Technology',
     positions: ['Frontend Developer', 'VR Engineer', 'Data Engineer', 'Content Moderator'],
     description: 'Social technology company connecting people through apps and immersive experiences.',
@@ -75,54 +75,6 @@ const companies = [
       name: 'Alex Thompson',
       email: 'alex.thompson@meta.com',
       phone: '+1-555-0106'
-    }
-  },
-  {
-    name: 'Netflix',
-    industry: 'Entertainment/Technology',
-    positions: ['Backend Engineer', 'Content Analyst', 'Streaming Engineer', 'Data Scientist'],
-    description: 'Streaming entertainment service with TV series, documentaries and feature films.',
-    website: 'https://www.netflix.com',
-    contactPerson: {
-      name: 'Maria Garcia',
-      email: 'maria.garcia@netflix.com',
-      phone: '+1-555-0107'
-    }
-  },
-  {
-    name: 'Spotify',
-    industry: 'Music/Technology',
-    positions: ['Audio Engineer', 'ML Engineer', 'Mobile Developer', 'Music Analyst'],
-    description: 'Audio streaming and media services provider with music and podcast content.',
-    website: 'https://www.spotify.com',
-    contactPerson: {
-      name: 'James Wilson',
-      email: 'james.wilson@spotify.com',
-      phone: '+1-555-0108'
-    }
-  },
-  {
-    name: 'Uber',
-    industry: 'Transportation/Technology',
-    positions: ['Mobile Developer', 'Operations Manager', 'Map Engineer', 'Safety Analyst'],
-    description: 'Technology platform connecting riders with drivers for transportation services.',
-    website: 'https://www.uber.com',
-    contactPerson: {
-      name: 'Rachel Brown',
-      email: 'rachel.brown@uber.com',
-      phone: '+1-555-0109'
-    }
-  },
-  {
-    name: 'Airbnb',
-    industry: 'Hospitality/Technology',
-    positions: ['Full Stack Developer', 'Design Engineer', 'Trust & Safety Specialist', 'Community Manager'],
-    description: 'Online marketplace for lodging and tourism experiences around the world.',
-    website: 'https://www.airbnb.com',
-    contactPerson: {
-      name: 'Kevin Lee',
-      email: 'kevin.lee@airbnb.com',
-      phone: '+1-555-0110'
     }
   }
 ];

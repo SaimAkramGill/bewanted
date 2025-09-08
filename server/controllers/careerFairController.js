@@ -1,6 +1,7 @@
-const Student = require('../models/student');
 const Company = require('../models/Company');
 const Appointment = require('../models/Appointment');
+const emailService = require('../services/emailService');
+
 
 // @desc    Get all companies
 // @route   GET /api/career-fair/companies
@@ -41,7 +42,7 @@ const getAvailableSlots = async (req, res) => {
       });
     }
 
-    // Get all booked slots for this date
+    // Get all booked slots for this date (non-cancelled appointments)
     const bookedAppointments = await Appointment.find({
       date: requestedDate,
       status: { $ne: 'cancelled' }
@@ -107,57 +108,73 @@ const registerStudent = async (req, res) => {
       });
     }
 
-    // Check if student already exists
-    let student = await Student.findOne({ email: studentInfo.email });
-    
-    if (student) {
-      // Update existing student info
-      student = await Student.findByIdAndUpdate(
-        student._id,
-        studentInfo,
-        { new: true, runValidators: true }
-      );
-    } else {
-      // Create new student
-      student = await Student.create(studentInfo);
+    // Validate student info
+    const requiredFields = ['firstName', 'lastName', 'email', 'phoneNumber', 'fieldOfStudy', 'motivation'];
+    for (const field of requiredFields) {
+      if (!studentInfo[field] || !studentInfo[field].toString().trim()) {
+        return res.status(400).json({
+          success: false,
+          message: `${field} is required`
+        });
+      }
     }
 
-    // Validate and create appointments
+    // Create appointments with embedded student info
     const createdAppointments = [];
     const errors = [];
 
     for (const appointmentData of appointments) {
       for (const apt of appointmentData.appointments) {
         try {
-          // Check if slot is already booked
-          const existingAppointment = await Appointment.findOne({
+          // Check if time slot is already booked for this company
+          const existingCompanyAppointment = await Appointment.findOne({
             company: appointmentData.companyId,
             date: new Date(apt.date),
             timeSlot: apt.timeSlot,
             status: { $ne: 'cancelled' }
           });
 
-          if (existingAppointment) {
+          if (existingCompanyAppointment) {
             errors.push(`Time slot ${apt.timeSlot} is already booked for ${appointmentData.companyName}`);
             continue;
           }
 
           // Check if student already has appointment at this time
-          const studentConflict = await Appointment.findOne({
-            student: student._id,
+          const studentTimeConflict = await Appointment.findOne({
+            'studentInfo.email': studentInfo.email.toLowerCase().trim(),
             date: new Date(apt.date),
             timeSlot: apt.timeSlot,
             status: { $ne: 'cancelled' }
           });
 
-          if (studentConflict) {
-            errors.push(`You already have an appointment at ${apt.timeSlot}`);
+          if (studentTimeConflict) {
+            errors.push(`You already have an appointment at ${apt.timeSlot} on ${apt.date}`);
             continue;
           }
 
-          // Create appointment
+          // Check if student already has appointment with this company on this date
+          const studentCompanyConflict = await Appointment.findOne({
+            'studentInfo.email': studentInfo.email.toLowerCase().trim(),
+            company: appointmentData.companyId,
+            date: new Date(apt.date),
+            status: { $ne: 'cancelled' }
+          });
+
+          if (studentCompanyConflict) {
+            errors.push(`You already have an appointment with ${appointmentData.companyName} on ${apt.date}`);
+            continue;
+          }
+
+          // Create appointment with embedded student info
           const appointment = await Appointment.create({
-            student: student._id,
+            studentInfo: {
+              firstName: studentInfo.firstName.trim(),
+              lastName: studentInfo.lastName.trim(),
+              email: studentInfo.email.toLowerCase().trim(),
+              phoneNumber: studentInfo.phoneNumber.trim(),
+              fieldOfStudy: studentInfo.fieldOfStudy,
+              motivation: studentInfo.motivation.trim()
+            },
             company: appointmentData.companyId,
             date: new Date(apt.date),
             timeSlot: apt.timeSlot
@@ -166,7 +183,18 @@ const registerStudent = async (req, res) => {
           createdAppointments.push(appointment);
         } catch (error) {
           console.error('Appointment creation error:', error);
-          errors.push(`Failed to book ${apt.timeSlot} with ${appointmentData.companyName}`);
+          if (error.code === 11000) {
+            // Handle duplicate key error
+            if (error.keyPattern && error.keyPattern['studentInfo.email']) {
+              errors.push(`You already have an appointment at ${apt.timeSlot} on ${apt.date}`);
+            } else if (error.keyPattern && error.keyPattern.company) {
+              errors.push(`Time slot ${apt.timeSlot} is already booked for ${appointmentData.companyName}`);
+            } else {
+              errors.push(`Booking conflict for ${apt.timeSlot} with ${appointmentData.companyName}`);
+            }
+          } else {
+            errors.push(`Failed to book ${apt.timeSlot} with ${appointmentData.companyName}: ${error.message}`);
+          }
         }
       }
     }
@@ -179,18 +207,44 @@ const registerStudent = async (req, res) => {
       });
     }
 
-    // Populate the created appointments
+    // Populate the created appointments with company details
     const populatedAppointments = await Appointment.find({
       _id: { $in: createdAppointments.map(apt => apt._id) }
-    })
-    .populate('company', 'name industry')
-    .populate('student', 'firstName lastName email');
+    }).populate('company', 'name industry positions website');
+
+    // Send emails after successful registration
+    try {
+      console.log('📧 Sending registration emails...');
+      
+      const emailResults = await emailService.sendRegistrationEmails(
+        studentInfo, 
+        populatedAppointments
+      );
+
+      console.log('📧 Email results:', {
+        student: emailResults.student.success ? '✅ Sent' : '❌ Failed',
+        admin: emailResults.admin.success ? '✅ Sent' : '❌ Failed'
+      });
+
+      // Don't fail the registration if emails fail
+      if (!emailResults.student.success || !emailResults.admin.success) {
+        console.warn('⚠️ Some emails failed to send, but registration was successful');
+      }
+    } catch (emailError) {
+      console.error('📧 Email service error:', emailError);
+      // Continue with successful response even if emails fail
+    }
 
     res.status(201).json({
       success: true,
-      message: `Successfully registered and booked ${createdAppointments.length} appointment${createdAppointments.length > 1 ? 's' : ''}`,
+      message: `Successfully registered and booked ${createdAppointments.length} appointment${createdAppointments.length > 1 ? 's' : ''}. Confirmation emails have been sent.`,
       data: {
-        student,
+        student: {
+          firstName: studentInfo.firstName,
+          lastName: studentInfo.lastName,
+          email: studentInfo.email,
+          fieldOfStudy: studentInfo.fieldOfStudy
+        },
         appointments: populatedAppointments,
         errors: errors.length > 0 ? errors : undefined
       }
@@ -209,14 +263,6 @@ const registerStudent = async (req, res) => {
       });
     }
 
-    // Handle duplicate email error
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'Student with this email already registered'
-      });
-    }
-
     res.status(500).json({
       success: false,
       message: 'Registration failed. Please try again.'
@@ -224,36 +270,35 @@ const registerStudent = async (req, res) => {
   }
 };
 
-// @desc    Get student appointments
+// @desc    Get student appointments by email
 // @route   GET /api/career-fair/student/:email/appointments
 // @access  Public
 const getStudentAppointments = async (req, res) => {
   try {
     const { email } = req.params;
     
-    const student = await Student.findOne({ email });
-    if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: 'Student not found'
-      });
-    }
-
     const appointments = await Appointment.find({ 
-      student: student._id,
+      'studentInfo.email': email.toLowerCase(),
       status: { $ne: 'cancelled' }
     })
-    .populate('company', 'name industry positions')
+    .populate('company', 'name industry positions website')
     .sort({ date: 1, timeSlot: 1 });
+
+    if (appointments.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No appointments found for this email'
+      });
+    }
 
     res.json({
       success: true,
       data: {
         student: {
-          firstName: student.firstName,
-          lastName: student.lastName,
-          email: student.email,
-          fieldOfStudy: student.fieldOfStudy
+          firstName: appointments[0].studentInfo.firstName,
+          lastName: appointments[0].studentInfo.lastName,
+          email: appointments[0].studentInfo.email,
+          fieldOfStudy: appointments[0].studentInfo.fieldOfStudy
         },
         appointments
       }
@@ -305,14 +350,22 @@ const cancelAppointment = async (req, res) => {
   }
 };
 
-// @desc    Get career fair statistics (Admin only)
+// @desc    Get career fair statistics
 // @route   GET /api/career-fair/stats
-// @access  Private/Admin
+// @access  Public
 const getCareerFairStats = async (req, res) => {
   try {
-    const totalStudents = await Student.countDocuments();
+    // Get unique students count
+    const uniqueStudents = await Appointment.aggregate([
+      { $match: { status: { $ne: 'cancelled' } } },
+      { $group: { _id: '$studentInfo.email' } },
+      { $count: 'totalStudents' }
+    ]);
+
+    const totalStudents = uniqueStudents[0]?.totalStudents || 0;
     const totalCompanies = await Company.countDocuments({ isActive: true });
     const totalAppointments = await Appointment.countDocuments({ status: { $ne: 'cancelled' } });
+    
     const todayAppointments = await Appointment.countDocuments({
       date: {
         $gte: new Date().setHours(0, 0, 0, 0),
@@ -344,6 +397,13 @@ const getCareerFairStats = async (req, res) => {
       }
     ]);
 
+    // Get field of study distribution
+    const fieldDistribution = await Appointment.aggregate([
+      { $match: { status: { $ne: 'cancelled' } } },
+      { $group: { _id: '$studentInfo.fieldOfStudy', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
     res.json({
       success: true,
       data: {
@@ -351,7 +411,8 @@ const getCareerFairStats = async (req, res) => {
         totalCompanies,
         totalAppointments,
         todayAppointments,
-        popularCompanies
+        popularCompanies,
+        fieldDistribution
       }
     });
   } catch (error) {
