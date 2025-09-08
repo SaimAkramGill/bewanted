@@ -22,8 +22,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/users', require('./routes/users'));
+// app.use('/api/auth', require('./routes/auth'));
+//app.use('/api/users', require('./routes/users'));
 app.use('/api/career-fair', require('./routes/careerFair')); // ← ADD THIS LINE
 
 // Health check route
@@ -46,9 +46,9 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/api/health',
-      auth: '/api/auth',
-      users: '/api/users',
-      careerFair: '/api/career-fair' // ← ADD THIS LINE
+      //auth: '/api/auth',
+      //users: '/api/users',
+      careerFair: '/api/career-fair' 
     }
   });
 });

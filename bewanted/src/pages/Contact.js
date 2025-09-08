@@ -61,15 +61,12 @@ const Contact = () => {
             <div className="contact-methods">
               <div className="contact-method">
                 <h3>📧 Email</h3>
-                <p>hello@bewanted.com</p>
+                <p>graz@bewanted.at</p>
               </div>
-              <div className="contact-method">
-                <h3>📱 Phone</h3>
-                <p>+1 (555) 123-4567</p>
-              </div>
+            
               <div className="contact-method">
                 <h3>📍 Address</h3>
-                <p>123 Tech Street<br />San Francisco, CA 94102</p>
+                <p>Münzgrabenstraße 35, <br />8010 Graz</p>
               </div>
             </div>
           </div>

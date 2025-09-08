@@ -59,29 +59,32 @@ const CareerFairForm = () => {
   const [usedTimeSlots, setUsedTimeSlots] = useState(new Set());
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState({});
-  const [selectedDate, setSelectedDate] = useState('');
+  //const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useState('2025-11-26');
   const [loading, setLoading] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
 
   // Generate available dates (next 30 days, excluding weekends)
-  const generateAvailableDates = () => {
-    const dates = [];
-    const today = new Date();
-    let currentDate = new Date(today);
+//  const generateAvailableDates = () => {
+//    const dates = [];
+//    const today = new Date();
+//    let currentDate = new Date(today);
     
-    while (dates.length < 20) {
-      currentDate.setDate(currentDate.getDate() + 1);
-      const dayOfWeek = currentDate.getDay();
+//    while (dates.length < 20) {
+//      currentDate.setDate(currentDate.getDate() + 1);
+//      const dayOfWeek = currentDate.getDay();
       
-      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-        dates.push(new Date(currentDate).toISOString().split('T')[0]);
-      }
-    }
+//      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+//        dates.push(new Date(currentDate).toISOString().split('T')[0]);
+//      }
+//    }
     
-    return dates;
-  };
+//    return dates;
+//  };
 
-  const [availableDates] = useState(generateAvailableDates());
+//  const [availableDates] = useState(generateAvailableDates());
+
+  const [availableDates] = useState(['2025-11-26']);
 
   // Fetch companies from backend
   useEffect(() => {
@@ -348,22 +351,35 @@ const CareerFairForm = () => {
 
   return (
     <div className="container">
-      {/* Progress Indicator */}
-      <div style={{ marginBottom: '30px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
-          <div className={`progress-step ${currentStep >= 1 ? 'active' : ''}`}>1</div>
-          <div className={`progress-line ${currentStep >= 2 ? 'active' : ''}`}></div>
-          <div className={`progress-step ${currentStep >= 2 ? 'active' : ''}`}>2</div>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '80px' }}>
-          <span className={currentStep >= 1 ? 'step-label active' : 'step-label'}>
-            Student Information
-          </span>
-          <span className={currentStep >= 2 ? 'step-label active' : 'step-label'}>
-            Company Appointments
-          </span>
-        </div>
-      </div>
+{/* Progress Indicator */}
+<div className="progress-indicator">
+  <div style={{ 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginBottom: '20px' 
+  }}>
+    <div className={`step-circle ${currentStep >= 1 ? 'active' : ''}`}>
+      1
+    </div>
+    <div className={`step-line ${currentStep >= 2 ? 'active' : ''}`}></div>
+    <div className={`step-circle ${currentStep >= 2 ? 'active' : ''}`}>
+      2
+    </div>
+  </div>
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    gap: '80px' 
+  }}>
+    <span className={`step-label ${currentStep >= 1 ? 'active' : ''}`}>
+      Student Information
+    </span>
+    <span className={`step-label ${currentStep >= 2 ? 'active' : ''}`}>
+      Company Appointments
+    </span>
+  </div>
+</div>
 
       {/* Error Display */}
       {errors.general && (
@@ -512,23 +528,18 @@ const CareerFairForm = () => {
           </div>
 
           {/* Date Selection */}
-          <div className="form-group">
-            <label>Select Date *</label>
-            <select
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="form-input"
-              style={{ maxWidth: '400px' }}
-            >
-              <option value="">Choose a date</option>
-              {availableDates.map(date => (
-                <option key={date} value={date}>
-                  {formatDate(date)}
-                </option>
-              ))}
-            </select>
-          </div>
-
+{/* Career Fair Date Display */}
+<div className="form-group">
+  <label>Career Fair Date</label>
+  <div className="form-input" style={{ 
+    backgroundColor: '#f8f9fa', 
+    border: '2px solid #28a745',
+    fontWeight: 'bold',
+    color: '#28a745'
+  }}>
+    {formatDate('2025-11-26')} - Wednesday, November 26, 2025
+  </div>
+</div>
           {selectedDate && (
             <>
               {/* Loading Indicator */}

@@ -1,22 +1,29 @@
 const express = require('express');
-const { 
-  registerUser, 
-  loginUser, 
-  getMe, 
-  updateProfile, 
-  changePassword 
-} = require('../controllers/authController');
-const { protect } = require('../middleware/auth');
+const {
+  getCompanies,
+  getAvailableSlots,
+  registerStudent,
+  getStudentAppointments,
+  cancelAppointment,
+  getCareerFairStats,
+  testEmailService,
+  getAllRegistrations
+} = require('../controllers/careerFairController');
 
 const router = express.Router();
 
 // Public routes
-router.post('/register', registerUser);
-router.post('/login', loginUser);
+router.get('/companies', getCompanies);
+router.get('/available-slots/:date', getAvailableSlots);
+router.post('/register', registerStudent);
+router.get('/student/:email/appointments', getStudentAppointments);
+router.put('/appointments/:id/cancel', cancelAppointment);
 
-// Private routes
-router.get('/me', protect, getMe);
-router.put('/profile', protect, updateProfile);
-router.put('/change-password', protect, changePassword);
+// Admin/Stats routes (now public since no auth)
+router.get('/stats', getCareerFairStats);
+router.get('/registrations', getAllRegistrations);
+
+// Email testing route (remove in production)
+router.post('/test-email', testEmailService);
 
 module.exports = router;

@@ -9,7 +9,27 @@ const Footer = () => {
       <div className="container">
         <div className="footer-content">
           <div className="footer-section">
-            <h3>beWanted</h3>
+            <Link to="/" className="footer-logo-link">
+              <div className="footer-logo-container">
+                {/* Option A: If you put the logo in public/images/ folder */}
+                <img 
+                  src="/logos/Bewanted-bw-head-03.svg" 
+                  alt="beWanted Logo" 
+                  className="footer-logo-image"
+                />
+                
+                {/* Option B: If you want to import from src/assets/ folder, 
+                    uncomment the import at the top and use:
+                <img 
+                  src={logo} 
+                  alt="beWanted Logo" 
+                  className="footer-logo-image"
+                />
+                */}
+                
+                <h3 className="footer-logo-text">beWanted</h3>
+              </div>
+            </Link>
             <p>Graz’s premier career event connecting talent with opportunity.</p>
           </div>
           
@@ -82,6 +102,7 @@ const Footer = () => {
         </div>
         
         <div className="footer-bottom">
+          
           <p>&copy; {currentYear} beWanted. All rights reserved.</p>
         </div>
       </div>

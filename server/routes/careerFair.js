@@ -7,18 +7,18 @@ const {
   cancelAppointment,
   getCareerFairStats
 } = require('../controllers/careerFairController');
-const { protect, admin } = require('../middleware/auth');
+// Remove: const { protect, admin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Public routes
+// Keep all public routes
 router.get('/companies', getCompanies);
 router.get('/available-slots/:date', getAvailableSlots);
 router.post('/register', registerStudent);
 router.get('/student/:email/appointments', getStudentAppointments);
 router.put('/appointments/:id/cancel', cancelAppointment);
 
-// Admin routes
-router.get('/stats', protect, admin, getCareerFairStats);
+// Make stats public or remove if not needed
+router.get('/stats', getCareerFairStats);  // Remove protect, admin
 
 module.exports = router;

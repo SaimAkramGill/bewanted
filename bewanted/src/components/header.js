@@ -1,27 +1,40 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const Header = () => {
-  const { user, isAuthenticated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-    setIsMenuOpen(false);
-  };
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
+  const closeMenu = () => {
+    setIsMenuOpen(false);
+  };
+
   return (
     <header className="header">
       <div className="container">
-        <Link to="/" className="logo">
-          <h1>beWanted</h1>
+        <Link to="/" className="logo" onClick={closeMenu}>
+          <div className="logo-container">
+            {/* Option A: If you put the logo in public/images/ folder */}
+            <img 
+              src="/logos/Bewanted-bw-head-03.svg" 
+              alt="beWanted Logo" 
+              className="logo-image"
+            />
+            
+            {/* Option B: If you want to import from src/assets/ folder, 
+                uncomment the import at the top and use:
+            <img 
+              src={logo} 
+              alt="beWanted Logo" 
+              className="logo-image"
+            />
+            */}
+            
+          <h1 className="logo-text">beWanted</h1>
+          </div>
         </Link>
         
         {/* Desktop Navigation */}
@@ -29,31 +42,15 @@ const Header = () => {
           <Link to="/" className="nav-link">Home</Link>
           <Link to="/about" className="nav-link">About</Link>
           <Link to="/contact" className="nav-link">Contact</Link>
-          <Link to="/career-fair" className="nav-link">Career Fair</Link>
-          
-          {isAuthenticated ? (
-            <>
-              <Link to="/dashboard" className="nav-link">Dashboard</Link>
-              <div className="user-menu">
-                <span className="user-name">Hi, {user?.name}</span>
-                <div className="dropdown">
-                  <Link to="/profile" className="dropdown-link">Profile</Link>
-                  <button onClick={handleLogout} className="dropdown-link logout-btn">
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className="nav-link">Login</Link>
-              <Link to="/register" className="nav-link btn-primary">Register</Link>
-            </>
-          )}
+          <Link to="/career-fair" className="nav-link btn-primary">Career Fair</Link>
         </nav>
 
         {/* Mobile Menu Button */}
-        <button className="mobile-menu-btn" onClick={toggleMenu}>
+        <button 
+          className={`mobile-menu-btn ${isMenuOpen ? 'active' : ''}`} 
+          onClick={toggleMenu}
+          aria-label="Toggle mobile menu"
+        >
           <span></span>
           <span></span>
           <span></span>
@@ -61,40 +58,37 @@ const Header = () => {
 
         {/* Mobile Navigation */}
         <nav className={`mobile-nav ${isMenuOpen ? 'active' : ''}`}>
-          <Link to="/" className="nav-link" onClick={() => setIsMenuOpen(false)}>
+          <Link to="/" className="nav-link" onClick={closeMenu}>
             Home
           </Link>
-          <Link to="/about" className="nav-link" onClick={() => setIsMenuOpen(false)}>
+          <Link to="/about" className="nav-link" onClick={closeMenu}>
             About
           </Link>
-          <Link to="/contact" className="nav-link" onClick={() => setIsMenuOpen(false)}>
+          <Link to="/contact" className="nav-link" onClick={closeMenu}>
             Contact
           </Link>
-          
-          {isAuthenticated ? (
-            <>
-              <Link to="/dashboard" className="nav-link" onClick={() => setIsMenuOpen(false)}>
-                Dashboard
-              </Link>
-              <Link to="/profile" className="nav-link" onClick={() => setIsMenuOpen(false)}>
-                Profile
-              </Link>
-              <button onClick={handleLogout} className="nav-link logout-btn">
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <Link to="/login" className="nav-link" onClick={() => setIsMenuOpen(false)}>
-                Login
-              </Link>
-              <Link to="/register" className="nav-link" onClick={() => setIsMenuOpen(false)}>
-                Register
-              </Link>
-            </>
-          )}
+          <Link to="/career-fair" className="nav-link btn-primary" onClick={closeMenu}>
+            Join Career Fair
+          </Link>
         </nav>
       </div>
+      
+      {/* Mobile menu overlay */}
+      {isMenuOpen && (
+        <div 
+          className="mobile-menu-overlay" 
+          onClick={closeMenu}
+          style={{
+            position: 'fixed',
+            top: '70px',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.3)',
+            zIndex: 998
+          }}
+        />
+      )}
     </header>
   );
 };
