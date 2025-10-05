@@ -10,7 +10,7 @@ const companies = [
     industry: 'Technology',
     positions: ['Software Engineer', 'Data Scientist', 'Product Manager', 'UX Designer'],
     description: 'Leading technology company focused on search, cloud computing, and artificial intelligence.',
-    website: 'https://www.google.com',
+    website: 'https://www.anton-paar.com/at-de/',
     contactPerson: {
       name: 'Sarah Johnson',
       email: 'sarah.johnson@google.com',
@@ -22,7 +22,7 @@ const companies = [
     industry: 'Technology',
     positions: ['Cloud Engineer', 'Software Developer', 'Azure Specialist', 'AI Engineer'],
     description: 'Global technology company developing software, services, devices and solutions.',
-    website: 'https://www.microsoft.com',
+    website: 'https://www.siemens.com/at/de.html',
     contactPerson: {
       name: 'Mike Chen',
       email: 'mike.chen@microsoft.com',
@@ -34,7 +34,7 @@ const companies = [
     industry: 'E-commerce/Cloud',
     positions: ['DevOps Engineer', 'Business Analyst', 'Solutions Architect', 'Operations Manager'],
     description: 'Multinational technology company focusing on e-commerce, cloud computing, and AI.',
-    website: 'https://www.amazon.com',
+    website: 'https://netconomy.net/',
     contactPerson: {
       name: 'Emily Rodriguez',
       email: 'emily.rodriguez@amazon.com',
@@ -46,7 +46,7 @@ const companies = [
     industry: 'Automotive/Energy',
     positions: ['Mechanical Engineer', 'Software Engineer', 'Battery Engineer', 'Manufacturing Engineer'],
     description: 'Electric vehicle and clean energy company accelerating sustainable transport and energy.',
-    website: 'https://www.tesla.com',
+    website: 'https://www.ssi-schaefer.com/en-de/',
     contactPerson: {
       name: 'David Kim',
       email: 'david.kim@tesla.com',
@@ -58,7 +58,7 @@ const companies = [
     industry: 'Technology',
     positions: ['iOS Developer', 'Hardware Engineer', 'Machine Learning Engineer', 'Design Engineer'],
     description: 'Technology company that designs and develops consumer electronics and software.',
-    website: 'https://www.apple.com',
+    website: 'https://www.beyondnow.com/en/',
     contactPerson: {
       name: 'Lisa Wang',
       email: 'lisa.wang@apple.com',
@@ -70,7 +70,7 @@ const companies = [
     industry: 'Social Media/Technology',
     positions: ['Frontend Developer', 'VR Engineer', 'Data Engineer', 'Content Moderator'],
     description: 'Social technology company connecting people through apps and immersive experiences.',
-    website: 'https://www.meta.com',
+    website: 'https://www.oebb.at/en/',
     contactPerson: {
       name: 'Alex Thompson',
       email: 'alex.thompson@meta.com',
