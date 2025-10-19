@@ -112,6 +112,14 @@ const Home = () => {
           <div className="cta-content">
             <h2>Ready to connect with your favorite company?</h2>
             <p>Book your place at the career fair and explore exciting opportunities with leading companies.</p>
+            <div className="event-details">
+              <h3>Event Details</h3>
+              <p>
+                <strong>Date:</strong> November 26, 2025<br />
+                <strong>Time:</strong> 8:30 AM - 4:30 PM<br />
+                <strong>Location:</strong> Infeldgasse 13B
+              </p>
+            </div>
             <Link to="/career-fair" className="btn btn-primary">
               Reserve Your Spot Now
             </Link>

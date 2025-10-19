@@ -33,7 +33,7 @@ const Header = () => {
             />
             */}
             
-          <h1 className="logo-text">beWanted</h1>
+          <h1 className="logo-text">beWANTED</h1>
           </div>
         </Link>
         
@@ -42,7 +42,7 @@ const Header = () => {
           <Link to="/" className="nav-link">Home</Link>
           <Link to="/about" className="nav-link">About</Link>
           <Link to="/contact" className="nav-link">Contact</Link>
-          <Link to="/career-fair" className="nav-link btn-primary">Career Fair</Link>
+          <Link to="/career-fair" className="nav-link btn-primary">Apply</Link>
         </nav>
 
         {/* Mobile Menu Button */}
