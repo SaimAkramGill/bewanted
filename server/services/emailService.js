@@ -4,7 +4,7 @@ const handlebars = require('handlebars');
 // Create transporter
 const createTransporter = () => {
   // Gmail configuration (you can use other providers)
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: process.env.EMAIL_USER,
@@ -15,7 +15,7 @@ const createTransporter = () => {
 
 // Alternative SMTP configuration (for custom email providers)
 const createSMTPTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
     secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
@@ -89,7 +89,7 @@ const studentEmailTemplate = `
                     <strong>📅 Date:</strong> {{formatDate date}}<br>
                     <strong>🕐 Time:</strong> {{timeSlot}}<br>
                     <strong>🏢 Industry:</strong> {{company.industry}}<br>
-                    <strong>💼 Positions:</strong> {{join company.positions ", "}}
+                    <strong>💼 Positions:</strong> {{#if company.positions}}{{join company.positions ", "}}{{else}}N/A{{/if}}
                 </div>
             </div>
             {{/each}}
@@ -241,7 +241,7 @@ class EmailService {
       
       // Register custom helpers
       handlebars.registerHelper('formatDate', this.formatDate);
-      handlebars.registerHelper('join', (array, separator) => array.join(separator));
+      handlebars.registerHelper('join', (array, separator) => array && array.length ? array.join(separator) : 'N/A');
 
       const html = template({
         ...studentInfo,
@@ -347,3 +347,4 @@ class EmailService {
 }
 
 module.exports = new EmailService();
+
