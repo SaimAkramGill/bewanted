@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
+const fileUpload = require('express-fileupload');
 
 // Load environment variables
 dotenv.config();
@@ -18,13 +19,22 @@ const app = express();
 app.use(helmet());
 app.use(morgan('combined'));
 app.use(cors());
+
+// ⚠️ Don't parse JSON before multer routes
+// (Multer needs raw form-data stream)
+app.use('/api/career-fair', require('./routes/careerFair')); // <-- multer handles multipart
+
+// ✅ After multer routes, add JSON parsers for all other routes
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-// app.use('/api/auth', require('./routes/auth'));
-//app.use('/api/users', require('./routes/users'));
-app.use('/api/career-fair', require('./routes/careerFair')); // ← ADD THIS LINE
+// File Upload (if used elsewhere)
+app.use(fileUpload({
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  createParentPath: true,
+  abortOnLimit: true,
+  responseOnLimit: 'CV file size is too large (max 2MB)'
+}));
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -46,9 +56,7 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/api/health',
-      //auth: '/api/auth',
-      //users: '/api/users',
-      careerFair: '/api/career-fair' 
+      careerFair: '/api/career-fair'
     }
   });
 });
@@ -62,5 +70,5 @@ app.listen(PORT, () => {
   console.log(`🚀 beWanted Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🔗 API URL: http://localhost:${PORT}`);
-  console.log(`🎯 Career Fair API: http://localhost:${PORT}/api/career-fair`); // ← ADD THIS LINE
+  console.log(`🎯 Career Fair API: http://localhost:${PORT}/api/career-fair`);
 });
