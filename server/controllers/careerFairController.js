@@ -1,17 +1,52 @@
+const moment = require('moment');
 const Company = require('../models/Company');
 const Appointment = require('../models/Appointment');
 const emailService = require('../services/emailService');
 
+// ============ TIMESLOT GENERATION ============
 
-// @desc    Get all companies
-// @route   GET /api/career-fair/companies
-// @access  Public
+function generateTimeSlots(packageType) {
+  const slots = [];
+  
+  const morningStart = moment('09:00', 'HH:mm');
+  const morningEnd = moment('11:45', 'HH:mm');
+  const afternoonStart = moment('13:00', 'HH:mm');
+  const afternoonEnd = moment('17:20', 'HH:mm');
+
+  const interval = packageType === 'Platinum' ? 30 : 20;
+
+  function generateSessionSlots(startTime, endTime) {
+    let currentTime = moment(startTime);
+    
+    while (currentTime.clone().add(interval, 'minutes').isSameOrBefore(endTime)) {
+      const slotEnd = currentTime.clone().add(interval, 'minutes');
+      
+      slots.push({
+        start: currentTime.format('HH:mm'),
+        end: slotEnd.format('HH:mm'),
+        timeSlot: `${currentTime.format('HH:mm')} - ${slotEnd.format('HH:mm')}`
+      });
+      
+      currentTime.add(interval, 'minutes');
+    }
+  }
+
+  generateSessionSlots(morningStart, morningEnd);
+  generateSessionSlots(afternoonStart, afternoonEnd);
+
+  return slots;
+}
+
+function generateGoldTimeSlots() {
+  return generateTimeSlots('Gold');
+}
+
+// ============ GET COMPANIES ============
+
 const getCompanies = async (req, res) => {
   try {
-    const companies = await Company.find({ isActive: true })
-      .select('name industry positions description website logo')
-      .sort({ name: 1 });
-
+    const companies = await Company.find({ 'specialRules.bookingAvailable': true });
+    
     res.json({
       success: true,
       count: companies.length,
@@ -21,414 +56,286 @@ const getCompanies = async (req, res) => {
     console.error('Get companies error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching companies'
+      message: 'Error fetching companies',
+      error: error.message
     });
   }
 };
 
-// @desc    Get available time slots for a specific date
-// @route   GET /api/career-fair/available-slots/:date
-// @access  Public
+// ============ GET AVAILABLE SLOTS ============
+
 const getAvailableSlots = async (req, res) => {
   try {
-    const { date } = req.params;
-    const requestedDate = new Date(date);
-    
-    // Validate date
-    if (isNaN(requestedDate.getTime())) {
-      return res.status(400).json({
+    const { companyId } = req.params;
+    const { email } = req.query;
+
+    console.log(`Fetching slots for company: ${companyId}, email: ${email}`);
+
+    const company = await Company.findById(companyId);
+
+    if (!company) {
+      return res.status(404).json({
         success: false,
-        message: 'Invalid date format'
+        message: 'Company not found'
       });
     }
 
-    // Get all booked slots for this date (non-cancelled appointments)
-    const bookedAppointments = await Appointment.find({
-      date: requestedDate,
+    if (!company.specialRules?.bookingAvailable) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bookings not available for this company',
+        maintenance: true
+      });
+    }
+
+    // Generate timeslots
+    let timeSlots;
+    if (company.specialRules?.usesGoldTimeslots) {
+      timeSlots = generateGoldTimeSlots();
+    } else {
+      timeSlots = generateTimeSlots(company.packageType);
+    }
+
+    // Get existing bookings
+    const existingBookings = await Appointment.find({
+      company: companyId,
       status: { $ne: 'cancelled' }
-    }).select('timeSlot company');
+    }).select('timeSlot studentInfo.email');
 
-    // Generate all available time slots
-    const allTimeSlots = [];
-    for (let hour = 9; hour < 17; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
-        const start = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        const endMinute = minute + 15;
-        const endHour = endMinute >= 60 ? hour + 1 : hour;
-        const adjustedEndMinute = endMinute >= 60 ? 0 : endMinute;
-        const end = `${endHour.toString().padStart(2, '0')}:${adjustedEndMinute.toString().padStart(2, '0')}`;
-        allTimeSlots.push(`${start} - ${end}`);
-      }
+    // Check conflicts for this email
+    const emailBookings = email ? 
+      await Appointment.find({
+        'studentInfo.email': email.toLowerCase(),
+        status: { $ne: 'cancelled' }
+      }).select('timeSlot')
+      : [];
+
+    // Determine max bookings
+    let maxBookings = 2;
+    if (company.specialRules?.limitedBookings) {
+      maxBookings = 1;
     }
 
-    // Create availability map
-    const availability = {};
-    const companies = await Company.find({ isActive: true }).select('_id name');
-    
-    companies.forEach(company => {
-      availability[company._id] = {};
-      allTimeSlots.forEach(slot => {
-        const isBooked = bookedAppointments.some(
-          apt => apt.timeSlot === slot && apt.company.toString() === company._id.toString()
-        );
-        availability[company._id][slot] = !isBooked;
-      });
+    // Build availability
+    const availability = timeSlots.map(slot => {
+      const slotString = slot.timeSlot;
+      
+      const bookingCount = existingBookings.filter(
+        b => b.timeSlot === slotString
+      ).length;
+
+      const hasConflict = emailBookings.some(
+        b => b.timeSlot === slotString
+      );
+
+      return {
+        timeSlot: slotString,
+        available: bookingCount < maxBookings && !hasConflict,
+        conflict: hasConflict,
+        bookingsCount: bookingCount,
+        maxBookings: maxBookings
+      };
     });
 
     res.json({
       success: true,
       data: {
-        date,
-        timeSlots: allTimeSlots,
-        availability,
-        bookedSlots: bookedAppointments.length
+        companyId: company._id,
+        companyName: company.name,
+        timeSlots: availability
       }
     });
   } catch (error) {
     console.error('Get available slots error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching available slots'
+      message: 'Error fetching available slots',
+      error: error.message
     });
   }
 };
 
-// @desc    Register student and book appointments
-// @route   POST /api/career-fair/register
-// @access  Public
+// ============ REGISTER STUDENT ============
+
 const registerStudent = async (req, res) => {
   try {
-    const { studentInfo, appointments } = req.body;
+    console.log('\n========== REGISTRATION START ==========');
+    console.log('Received body keys:', Object.keys(req.body));
+    console.log('File:', req.file ? req.file.originalname : 'No file');
 
-    // Validate input
-    if (!studentInfo || !appointments || appointments.length === 0) {
+    let {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      fieldOfStudy,
+      motivation,
+      appointments
+    } = req.body;
+
+    // Parse appointments if string
+    if (typeof appointments === 'string') {
+      appointments = JSON.parse(appointments);
+    }
+
+    console.log('Parsed appointments:', appointments);
+
+    // Validation
+    if (!firstName || !lastName || !email || !phoneNumber || !fieldOfStudy || !motivation) {
+      console.log('Missing required fields');
       return res.status(400).json({
         success: false,
-        message: 'Student information and appointments are required'
+        message: 'All fields required'
       });
     }
 
-    // Validate student info
-    const requiredFields = ['firstName', 'lastName', 'email', 'phoneNumber', 'fieldOfStudy', 'motivation'];
-    for (const field of requiredFields) {
-      if (!studentInfo[field] || !studentInfo[field].toString().trim()) {
-        return res.status(400).json({
-          success: false,
-          message: `${field} is required`
+    if (!appointments || appointments.length === 0) {
+      console.log('No appointments provided');
+      return res.status(400).json({
+        success: false,
+        message: 'Select at least one company'
+      });
+    }
+
+    // Normalize email
+    email = email.trim().toLowerCase();
+
+    console.log(`Processing ${appointments.length} appointments for ${email}`);
+
+    // Create appointments
+    const createdAppointments = [];
+    const errors = [];
+
+    for (const apt of appointments) {
+      try {
+        console.log(`\nProcessing: Company ${apt.companyId}, Time ${apt.timeSlot}`);
+
+        // Validate inputs
+        if (!apt.companyId || !apt.timeSlot) {
+          throw new Error('Missing companyId or timeSlot');
+        }
+
+        // Find company
+        const company = await Company.findById(apt.companyId);
+        if (!company) {
+          throw new Error('Company not found');
+        }
+
+        console.log(`Found company: ${company.name}`);
+
+        // Check booking availability
+        if (!company.specialRules?.bookingAvailable) {
+          throw new Error('Company not available for booking');
+        }
+
+        // Check max bookings
+        let maxBookings = 2;
+        if (company.specialRules?.limitedBookings) {
+          maxBookings = 1;
+        }
+
+        const bookingCount = await Appointment.countDocuments({
+          company: apt.companyId,
+          timeSlot: apt.timeSlot,
+          status: { $ne: 'cancelled' }
+        });
+
+        console.log(`Current bookings: ${bookingCount}/${maxBookings}`);
+
+        if (bookingCount >= maxBookings) {
+          throw new Error('Timeslot is fully booked');
+        }
+
+        // Create appointment
+        const newAppointment = new Appointment({
+          studentInfo: {
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            email: email,
+            phoneNumber: phoneNumber.trim(),
+            fieldOfStudy: fieldOfStudy.trim(),
+            motivation: motivation.trim()
+          },
+          company: apt.companyId,
+          date: new Date('2025-11-26'),
+          timeSlot: apt.timeSlot,
+          status: 'scheduled',
+          cvPath: req.file?.path || null,
+          cvFileName: req.file?.originalname || null,
+          germanLanguageConfirmed: req.body.germanLanguageConfirmed === 'true' || false,
+          internshipInterest: req.body.internshipInterest === 'true' || false,
+          hasValidVisa: req.body.hasValidVisa === 'true' || false
+        });
+
+        console.log('Saving appointment...');
+        await newAppointment.save();
+        console.log('✅ Saved');
+
+        createdAppointments.push(newAppointment);
+
+      } catch (error) {
+        console.error(`Error on this appointment: ${error.message}`);
+        errors.push({
+          company: apt.companyId,
+          reason: error.message
         });
       }
     }
 
-    // Create appointments with embedded student info
-    const createdAppointments = [];
-    const errors = [];
+    console.log(`\nCreated ${createdAppointments.length} appointments`);
 
-    for (const appointmentData of appointments) {
-      for (const apt of appointmentData.appointments) {
-        try {
-          // Check if time slot is already booked for this company
-          const existingCompanyAppointment = await Appointment.findOne({
-            company: appointmentData.companyId,
-            date: new Date(apt.date),
-            timeSlot: apt.timeSlot,
-            status: { $ne: 'cancelled' }
-          });
-
-          if (existingCompanyAppointment) {
-            errors.push(`Time slot ${apt.timeSlot} is already booked for ${appointmentData.companyName}`);
-            continue;
-          }
-
-          // Check if student already has appointment at this time
-          const studentTimeConflict = await Appointment.findOne({
-            'studentInfo.email': studentInfo.email.toLowerCase().trim(),
-            date: new Date(apt.date),
-            timeSlot: apt.timeSlot,
-            status: { $ne: 'cancelled' }
-          });
-
-          if (studentTimeConflict) {
-            errors.push(`You already have an appointment at ${apt.timeSlot} on ${apt.date}`);
-            continue;
-          }
-
-          // Check if student already has appointment with this company on this date
-          const studentCompanyConflict = await Appointment.findOne({
-            'studentInfo.email': studentInfo.email.toLowerCase().trim(),
-            company: appointmentData.companyId,
-            date: new Date(apt.date),
-            status: { $ne: 'cancelled' }
-          });
-
-          if (studentCompanyConflict) {
-            errors.push(`You already have an appointment with ${appointmentData.companyName} on ${apt.date}`);
-            continue;
-          }
-
-          // Create appointment with embedded student info
-          const appointment = await Appointment.create({
-            studentInfo: {
-              firstName: studentInfo.firstName.trim(),
-              lastName: studentInfo.lastName.trim(),
-              email: studentInfo.email.toLowerCase().trim(),
-              phoneNumber: studentInfo.phoneNumber.trim(),
-              fieldOfStudy: studentInfo.fieldOfStudy,
-              motivation: studentInfo.motivation.trim()
-            },
-            company: appointmentData.companyId,
-            date: new Date(apt.date),
-            timeSlot: apt.timeSlot
-          });
-
-          createdAppointments.push(appointment);
-        } catch (error) {
-          console.error('Appointment creation error:', error);
-          if (error.code === 11000) {
-            // Handle duplicate key error
-            if (error.keyPattern && error.keyPattern['studentInfo.email']) {
-              errors.push(`You already have an appointment at ${apt.timeSlot} on ${apt.date}`);
-            } else if (error.keyPattern && error.keyPattern.company) {
-              errors.push(`Time slot ${apt.timeSlot} is already booked for ${appointmentData.companyName}`);
-            } else {
-              errors.push(`Booking conflict for ${apt.timeSlot} with ${appointmentData.companyName}`);
-            }
-          } else {
-            errors.push(`Failed to book ${apt.timeSlot} with ${appointmentData.companyName}: ${error.message}`);
-          }
-        }
-      }
-    }
-
-    if (errors.length > 0 && createdAppointments.length === 0) {
+    if (createdAppointments.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No appointments could be created',
+        message: 'Could not create appointments',
         errors
       });
     }
 
-    // Populate the created appointments with company details
-    const populatedAppointments = await Appointment.find({
-      _id: { $in: createdAppointments.map(apt => apt._id) }
-    }).populate('company', 'name industry positions website');
-
-    // Send emails after successful registration
+    // Send emails
     try {
-      console.log('📧 Sending registration emails...');
-      
-      const emailResults = await emailService.sendRegistrationEmails(
-        studentInfo, 
-        populatedAppointments
-      );
+      const studentInfo = {
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        fieldOfStudy
+      };
 
-      console.log('📧 Email results:', {
-        student: emailResults.student.success ? '✅ Sent' : '❌ Failed',
-        admin: emailResults.admin.success ? '✅ Sent' : '❌ Failed'
-      });
-
-      // Don't fail the registration if emails fail
-      if (!emailResults.student.success || !emailResults.admin.success) {
-        console.warn('⚠️ Some emails failed to send, but registration was successful');
-      }
+      await emailService.sendRegistrationEmails(studentInfo, createdAppointments);
+      console.log('✅ Emails sent');
     } catch (emailError) {
-      console.error('📧 Email service error:', emailError);
-      // Continue with successful response even if emails fail
+      console.warn('Email error (non-fatal):', emailError.message);
     }
+
+    console.log('========== REGISTRATION SUCCESS ==========\n');
 
     res.status(201).json({
       success: true,
-      message: `Successfully registered and booked ${createdAppointments.length} appointment${createdAppointments.length > 1 ? 's' : ''}. Confirmation emails have been sent.`,
+      message: 'Registration successful! Check your email.',
       data: {
-        student: {
-          firstName: studentInfo.firstName,
-          lastName: studentInfo.lastName,
-          email: studentInfo.email,
-          fieldOfStudy: studentInfo.fieldOfStudy
-        },
-        appointments: populatedAppointments,
-        errors: errors.length > 0 ? errors : undefined
+        appointmentsCreated: createdAppointments.length,
+        appointments: createdAppointments
       }
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
-    
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors
-      });
-    }
+    console.error('\n❌ REGISTRATION ERROR:', error.message);
+    console.error(error.stack);
+    console.log('========== REGISTRATION FAILED ==========\n');
 
     res.status(500).json({
       success: false,
-      message: 'Registration failed. Please try again.'
+      message: 'Registration error: ' + error.message,
+      error: error.message
     });
   }
 };
 
-// @desc    Get student appointments by email
-// @route   GET /api/career-fair/student/:email/appointments
-// @access  Public
-const getStudentAppointments = async (req, res) => {
-  try {
-    const { email } = req.params;
-    
-    const appointments = await Appointment.find({ 
-      'studentInfo.email': email.toLowerCase(),
-      status: { $ne: 'cancelled' }
-    })
-    .populate('company', 'name industry positions website')
-    .sort({ date: 1, timeSlot: 1 });
-
-    if (appointments.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No appointments found for this email'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        student: {
-          firstName: appointments[0].studentInfo.firstName,
-          lastName: appointments[0].studentInfo.lastName,
-          email: appointments[0].studentInfo.email,
-          fieldOfStudy: appointments[0].studentInfo.fieldOfStudy
-        },
-        appointments
-      }
-    });
-  } catch (error) {
-    console.error('Get student appointments error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching appointments'
-    });
-  }
-};
-
-// @desc    Cancel appointment
-// @route   PUT /api/career-fair/appointments/:id/cancel
-// @access  Public
-const cancelAppointment = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { reason } = req.body;
-
-    const appointment = await Appointment.findByIdAndUpdate(
-      id,
-      { 
-        status: 'cancelled',
-        notes: reason || 'Cancelled by student'
-      },
-      { new: true }
-    ).populate('company', 'name');
-
-    if (!appointment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Appointment not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Appointment cancelled successfully',
-      data: appointment
-    });
-  } catch (error) {
-    console.error('Cancel appointment error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error cancelling appointment'
-    });
-  }
-};
-
-// @desc    Get career fair statistics
-// @route   GET /api/career-fair/stats
-// @access  Public
-const getCareerFairStats = async (req, res) => {
-  try {
-    // Get unique students count
-    const uniqueStudents = await Appointment.aggregate([
-      { $match: { status: { $ne: 'cancelled' } } },
-      { $group: { _id: '$studentInfo.email' } },
-      { $count: 'totalStudents' }
-    ]);
-
-    const totalStudents = uniqueStudents[0]?.totalStudents || 0;
-    const totalCompanies = await Company.countDocuments({ isActive: true });
-    const totalAppointments = await Appointment.countDocuments({ status: { $ne: 'cancelled' } });
-    
-    const todayAppointments = await Appointment.countDocuments({
-      date: {
-        $gte: new Date().setHours(0, 0, 0, 0),
-        $lt: new Date().setHours(23, 59, 59, 999)
-      },
-      status: { $ne: 'cancelled' }
-    });
-
-    // Get popular companies
-    const popularCompanies = await Appointment.aggregate([
-      { $match: { status: { $ne: 'cancelled' } } },
-      { $group: { _id: '$company', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 5 },
-      {
-        $lookup: {
-          from: 'companies',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'company'
-        }
-      },
-      { $unwind: '$company' },
-      {
-        $project: {
-          name: '$company.name',
-          appointments: '$count'
-        }
-      }
-    ]);
-
-    // Get field of study distribution
-    const fieldDistribution = await Appointment.aggregate([
-      { $match: { status: { $ne: 'cancelled' } } },
-      { $group: { _id: '$studentInfo.fieldOfStudy', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
-    ]);
-
-    res.json({
-      success: true,
-      data: {
-        totalStudents,
-        totalCompanies,
-        totalAppointments,
-        todayAppointments,
-        popularCompanies,
-        fieldDistribution
-      }
-    });
-  } catch (error) {
-    console.error('Get stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching statistics'
-    });
-  }
-};
+// ============ EXPORTS ============
 
 module.exports = {
   getCompanies,
   getAvailableSlots,
-  registerStudent,
-  getStudentAppointments,
-  cancelAppointment,
-  getCareerFairStats
+  registerStudent
 };

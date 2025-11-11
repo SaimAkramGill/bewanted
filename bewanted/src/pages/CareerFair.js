@@ -1,35 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import '../App.css'; // Import the main CSS file from parent directory
+import axios from 'axios';
 
 const CareerFairForm = () => {
-  // API helper functions
-  const apiCall = async (endpoint, options = {}) => {
-    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-    const url = `${baseUrl}${endpoint}`;
-    
-    const defaultOptions = {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    };
-
-    const config = { ...defaultOptions, ...options };
-
-    try {
-      const response = await fetch(url, config);
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
-      }
-      
-      return data;
-    } catch (error) {
-      console.error('API call failed:', error);
-      throw error;
-    }
-  };
-
   // Form state
   const [formData, setFormData] = useState({
     firstName: '',
@@ -37,717 +9,791 @@ const CareerFairForm = () => {
     email: '',
     phoneNumber: '',
     fieldOfStudy: '',
-    motivation: ''
+    motivation: '',
+    cvFile: null,
+    cvFileName: '',
+    internshipInterest: false,
+    hasValidVisa: false,
+    germanLanguageConfirmed: false
   });
 
-  // Available data from backend
-  const [fieldsOfStudy] = useState([
-    'Computer Science', 'Software Engineering', 'Data Science', 'Cybersecurity',
-    'Information Technology', 'Business Administration', 'Marketing', 'Finance',
-    'Mechanical Engineering', 'Electrical Engineering', 'Civil Engineering',
-    'Biomedical Engineering', 'Medicine', 'Nursing', 'Psychology', 'Education',
-    'Law', 'Other'
-  ]);
-
+  // UI State
   const [companies, setCompanies] = useState([]);
-  const [availability, setAvailability] = useState({});
-  const [timeSlots, setTimeSlots] = useState([]);
-  
-  // Booking state
-  const [selectedCompanies, setSelectedCompanies] = useState([]);
-  const [bookedSlots, setBookedSlots] = useState({});
-  const [usedTimeSlots, setUsedTimeSlots] = useState(new Set());
-  const [currentStep, setCurrentStep] = useState(1);
-  const [errors, setErrors] = useState({});
-  //const [selectedDate, setSelectedDate] = useState('');
-  const [selectedDate, setSelectedDate] = useState('2025-11-26');
+  const [selectedCompanies, setSelectedCompanies] = useState({});
+  const [availableSlots, setAvailableSlots] = useState({});
   const [loading, setLoading] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState(null);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Generate available dates (next 30 days, excluding weekends)
-//  const generateAvailableDates = () => {
-//    const dates = [];
-//    const today = new Date();
-//    let currentDate = new Date(today);
-    
-//    while (dates.length < 20) {
-//      currentDate.setDate(currentDate.getDate() + 1);
-//      const dayOfWeek = currentDate.getDay();
-      
-//      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-//        dates.push(new Date(currentDate).toISOString().split('T')[0]);
-//      }
-//    }
-    
-//    return dates;
-//  };
+  const fieldOfStudyOptions = [
+    'Computer Science',
+    'Software Engineering and Management',
+    'Data Science',
+    'Cybersecurity',
+    'Information Technology',
+    'Business Administration',
+    'Marketing',
+    'Finance',
+    'Mechanical Engineering',
+    'Electrical Engineering',
+    'Civil Engineering',
+    'Biomedical Engineering',
+    'Computational Social Systems',
+    'BioTechnology',
+    'Artificial Intelligence',
+    'Other'
+  ];
 
-//  const [availableDates] = useState(generateAvailableDates());
-
-  const [availableDates] = useState(['2025-11-26']);
-
-  // Fetch companies from backend
+  // Fetch companies on component mount
   useEffect(() => {
     const fetchCompanies = async () => {
       try {
-        const response = await apiCall('/career-fair/companies');
-        if (response.success) {
-          setCompanies(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching companies:', error);
-        setErrors({ general: 'Failed to load companies. Please refresh the page.' });
+        setLoading(true);
+        const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+        console.log('Fetching companies from:', API_URL);
+        const response = await axios.get(`${API_URL}/career-fair/companies`);
+        console.log('Companies received:', response.data.data);
+        setCompanies(response.data.data);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching companies:', err);
+        setError('Failed to load companies. Please try again later.');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchCompanies();
   }, []);
 
-  // Fetch availability when date changes
-  useEffect(() => {
-    const fetchAvailability = async () => {
-      if (!selectedDate) return;
+  // Fetch available slots when company is selected
+  const handleCompanySelect = async (companyId) => {
+    try {
+      console.log('Selecting company:', companyId);
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const response = await axios.get(`${API_URL}/career-fair/available-slots/${companyId}`, {
+        params: { email: formData.email }
+      });
+      console.log('Slots received:', response.data.data);
+      
+      const company = response.data.data;
 
-      try {
-        setLoading(true);
-        const response = await apiCall(`/career-fair/available-slots/${selectedDate}`);
-        if (response.success) {
-          setAvailability(response.data.availability);
-          setTimeSlots(response.data.timeSlots);
-          
-          // Reset selections when date changes
-          setBookedSlots({});
-          setUsedTimeSlots(new Set());
+      setSelectedCompanies(prev => ({
+        ...prev,
+        [companyId]: {
+          selected: true,
+          company: company,
+          timeSlot: null
         }
-      } catch (error) {
-        console.error('Error fetching availability:', error);
-        setErrors({ general: 'Failed to load available time slots.' });
-      } finally {
-        setLoading(false);
+      }));
+
+      setAvailableSlots(prev => ({
+        ...prev,
+        [companyId]: company.timeSlots || []
+      }));
+
+      setError(null);
+    } catch (err) {
+      console.error('Error selecting company:', err);
+      if (err.response?.data?.maintenance) {
+        setError(`${err.response.data.message}`);
+      } else if (err.response?.status === 403) {
+        setError('This company is not available for booking');
+      } else {
+        setError('Failed to load available slots. Please try again.');
       }
-    };
-
-    fetchAvailability();
-  }, [selectedDate]);
-
-  // Validation
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Invalid email format';
     }
-    if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = 'Phone number is required';
-    } else if (!/^\+?[\d\s\-()\x20]{10,}$/.test(formData.phoneNumber)) {
-      newErrors.phoneNumber = 'Invalid phone number format';
-    }
-    if (!formData.fieldOfStudy) newErrors.fieldOfStudy = 'Field of study is required';
-    if (!formData.motivation.trim()) newErrors.motivation = 'Motivation is required';
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
-  // Handle form input changes
+  // Handle company deselection
+  const handleCompanyDeselect = (companyId) => {
+    console.log('Deselecting company:', companyId);
+    setSelectedCompanies(prev => {
+      const updated = { ...prev };
+      delete updated[companyId];
+      return updated;
+    });
+  };
+
+  // Handle timeslot selection
+  const handleTimeSlotSelect = (companyId, timeSlot) => {
+    console.log('Selected timeslot:', companyId, timeSlot);
+    setSelectedCompanies(prev => ({
+      ...prev,
+      [companyId]: {
+        ...prev[companyId],
+        timeSlot: timeSlot
+      }
+    }));
+  };
+
+  // Handle input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    
-    if (errors[name]) {
-      setErrors(prev => ({
+  };
+
+  // Handle CV file upload
+  const handleCVChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setError('CV file must be less than 2MB');
+        return;
+      }
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      if (!allowedTypes.includes(file.type)) {
+        setError('Only PDF, DOC, and DOCX files are allowed');
+        return;
+      }
+      setFormData(prev => ({
         ...prev,
-        [name]: ''
+        cvFile: file,
+        cvFileName: file.name
       }));
+      setError(null);
     }
   };
 
-  // Handle company selection
-  const handleCompanySelect = (company) => {
-    setSelectedCompanies(prev => {
-      const isSelected = prev.find(c => c._id === company._id);
-      if (isSelected) {
-        // Remove company and its booking
-        const newBookedSlots = { ...bookedSlots };
-        if (newBookedSlots[company._id]) {
-          const timeSlot = newBookedSlots[company._id][selectedDate];
-          if (timeSlot) {
-            setUsedTimeSlots(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(timeSlot);
-              return newSet;
-            });
-          }
-          delete newBookedSlots[company._id];
-          setBookedSlots(newBookedSlots);
-        }
-        return prev.filter(c => c._id !== company._id);
-      } else {
-        return [...prev, company];
+  // Handle special checkbox changes
+  const handleCompanyFieldChange = (companyId, field, value) => {
+    console.log('Field change:', companyId, field, value);
+    setSelectedCompanies(prev => ({
+      ...prev,
+      [companyId]: {
+        ...prev[companyId],
+        [field]: value
       }
-    });
-  };
-
-  // Handle time slot booking
-  const handleTimeSlotSelect = (companyId, timeSlot) => {
-    // Check if this time slot is available for this company
-    if (!availability[companyId] || !availability[companyId][timeSlot]) {
-      alert('This time slot is not available for this company.');
-      return;
-    }
-
-    // Check if this time slot is already used by student
-    if (usedTimeSlots.has(timeSlot)) {
-      alert('You already have an appointment at this time. Please select a different time.');
-      return;
-    }
-
-    // Update booked slots
-    setBookedSlots(prev => {
-      const newBookedSlots = { ...prev };
-      
-      // Remove old time slot from used slots if company had a previous booking
-      if (newBookedSlots[companyId] && newBookedSlots[companyId][selectedDate]) {
-        const oldTimeSlot = newBookedSlots[companyId][selectedDate];
-        setUsedTimeSlots(prevUsed => {
-          const newSet = new Set(prevUsed);
-          newSet.delete(oldTimeSlot);
-          return newSet;
-        });
-      }
-      
-      // Add new booking
-      if (!newBookedSlots[companyId]) {
-        newBookedSlots[companyId] = {};
-      }
-      newBookedSlots[companyId][selectedDate] = timeSlot;
-      
-      return newBookedSlots;
-    });
-
-    // Add new time slot to used slots
-    setUsedTimeSlots(prev => new Set([...prev, timeSlot]));
+    }));
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validateForm()) {
-      setCurrentStep(2);
+
+    // Validate required fields
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phoneNumber || !formData.fieldOfStudy || !formData.motivation) {
+      setError('Please fill in all required fields');
+      return;
     }
-  };
 
-  // Handle final booking submission
-  const handleBookingSubmit = async () => {
-    setLoading(true);
-    setSubmitStatus(null);
-
-    try {
-      // Prepare booking data
-      const appointments = Object.entries(bookedSlots).map(([companyId, dates]) => ({
+    // Validate at least one appointment is selected
+    const appointments = Object.entries(selectedCompanies)
+      .filter(([, data]) => data.timeSlot)
+      .map(([companyId, data]) => ({
         companyId,
-        companyName: companies.find(c => c._id === companyId)?.name,
-        appointments: Object.entries(dates).map(([date, timeSlot]) => ({
-          date,
-          timeSlot
-        }))
+        timeSlot: data.timeSlot
       }));
 
-      const bookingData = {
-        studentInfo: formData,
-        appointments
-      };
+    if (appointments.length === 0) {
+      setError('Please select at least one appointment');
+      return;
+    }
 
-      const response = await apiCall('/career-fair/register', {
-        method: 'POST',
-        body: JSON.stringify(bookingData)
-      });
+    // Validate special requirements
+    for (const [companyId, data] of Object.entries(selectedCompanies)) {
+      if (!data.timeSlot) continue;
 
-      if (response.success) {
-        setSubmitStatus({
-          type: 'success',
-          message: response.message,
-          data: response.data
-        });
+      const company = companies.find(c => c._id === companyId);
+      if (!company) continue;
 
-        // Reset form after successful submission
-        setTimeout(() => {
-          setFormData({
-            firstName: '',
-            lastName: '',
-            email: '',
-            phoneNumber: '',
-            fieldOfStudy: '',
-            motivation: ''
-          });
-          setSelectedCompanies([]);
-          setBookedSlots({});
-          setUsedTimeSlots(new Set());
-          setCurrentStep(1);
-          setSelectedDate('');
-          setSubmitStatus(null);
-        }, 5000);
+      // Check German requirement
+      if (company.specialRules?.germanRequired && !data.germanLanguageConfirmed) {
+        setError(`${company.name} requires confirmation of B2 level German`);
+        return;
       }
-    } catch (error) {
-      console.error('Booking submission error:', error);
-      setSubmitStatus({
-        type: 'error',
-        message: error.message || 'Failed to submit booking. Please try again.',
-        errors: error.errors
+
+      // Check internship requirement
+      if (company.specialRules?.internshipVisa && (!data.internshipInterest || !data.hasValidVisa)) {
+        setError(`${company.name} requires confirmation of internship interest and valid visa`);
+        return;
+      }
+    }
+
+    try {
+      setSubmitting(true);
+      setError(null);
+
+      const formDataToSubmit = new FormData();
+      formDataToSubmit.append('firstName', formData.firstName);
+      formDataToSubmit.append('lastName', formData.lastName);
+      formDataToSubmit.append('email', formData.email);
+      formDataToSubmit.append('phoneNumber', formData.phoneNumber);
+      formDataToSubmit.append('fieldOfStudy', formData.fieldOfStudy);
+      formDataToSubmit.append('motivation', formData.motivation);
+      
+      if (formData.cvFile) {
+        formDataToSubmit.append('cv', formData.cvFile);
+      }
+
+      formDataToSubmit.append('appointments', JSON.stringify(appointments));
+
+      // Add special checkboxes
+      Object.entries(selectedCompanies).forEach(([companyId, data]) => {
+        if (data.germanLanguageConfirmed) {
+          formDataToSubmit.append(`${companyId}_germanLanguageConfirmed`, true);
+        }
+        if (data.internshipInterest) {
+          formDataToSubmit.append(`${companyId}_internshipInterest`, true);
+        }
+        if (data.hasValidVisa) {
+          formDataToSubmit.append(`${companyId}_hasValidVisa`, true);
+        }
       });
+
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+      const response = await axios.post(
+  `${API_URL}/career-fair/register`,
+  formDataToSubmit
+);
+
+      console.log('Registration successful:', response.data);
+      setSuccess(true);
+      
+      // Reset form
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        fieldOfStudy: '',
+        motivation: '',
+        cvFile: null,
+        cvFileName: '',
+        internshipInterest: false,
+        hasValidVisa: false,
+        germanLanguageConfirmed: false
+      });
+      setSelectedCompanies({});
+      setAvailableSlots({});
+
+      const fileInput = document.getElementById('cvInput');
+      if (fileInput) fileInput.value = '';
+
+      setTimeout(() => setSuccess(false), 5000);
+    } catch (err) {
+      console.error('Error submitting form:', err);
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+      } else {
+        setError('Failed to register. Please try again.');
+      }
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  // Success screen
-  if (submitStatus?.type === 'success') {
+  if (loading) {
     return (
-      <div className="container">
-        <div className="auth-card" style={{ textAlign: 'center', maxWidth: '600px', margin: '2rem auto' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🎉</div>
-          <h1 style={{ color: '#28a745', marginBottom: '20px' }}>Registration Successful!</h1>
-          <p style={{ fontSize: '1.1rem', marginBottom: '30px' }}>
-            {submitStatus.message}
-          </p>
-          
-          <div className="dashboard-card" style={{ textAlign: 'left', marginBottom: '30px' }}>
-            <h3>Your Appointments:</h3>
-            {submitStatus.data?.appointments?.map((apt, index) => (
-              <div key={index} className="activity-item" style={{ marginBottom: '10px' }}>
-                <div className="activity-icon" style={{ fontSize: '1.2rem' }}>🏢</div>
-                <div>
-                  <div className="activity-title">{apt.company.name}</div>
-                  <div className="activity-time">📅 {formatDate(apt.date)} at {apt.timeSlot}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <p style={{ color: '#666', fontSize: '0.9rem' }}>
-            You will receive a confirmation email shortly. This page will redirect automatically in a few seconds.
-          </p>
-        </div>
+      <div className="container" style={{ textAlign: 'center', padding: '60px 20px' }}>
+        <div className="spinner"></div>
+        <p style={{ marginTop: '20px', color: '#666' }}>Loading companies...</p>
       </div>
     );
   }
 
   return (
-    <div className="container">
-{/* Progress Indicator */}
-<div className="progress-indicator">
-  <div style={{ 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    marginBottom: '20px' 
-  }}>
-    <div className={`step-circle ${currentStep >= 1 ? 'active' : ''}`}>
-      1
-    </div>
-    <div className={`step-line ${currentStep >= 2 ? 'active' : ''}`}></div>
-    <div className={`step-circle ${currentStep >= 2 ? 'active' : ''}`}>
-      2
-    </div>
-  </div>
-  <div style={{ 
-    display: 'flex', 
-    justifyContent: 'center', 
-    gap: '80px' 
-  }}>
-    <span className={`step-label ${currentStep >= 1 ? 'active' : ''}`}>
-      Student Information
-    </span>
-    <span className={`step-label ${currentStep >= 2 ? 'active' : ''}`}>
-      Company Appointments
-    </span>
-  </div>
-</div>
-
-      {/* Error Display */}
-      {errors.general && (
-        <div className="error-message">
-          {errors.general}
-        </div>
-      )}
-
-      {submitStatus?.type === 'error' && (
-        <div className="error-message">
-          <strong>Error:</strong> {submitStatus.message}
-          {submitStatus.errors && (
-            <ul style={{ marginTop: '10px', marginBottom: '0' }}>
-              {submitStatus.errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {/* Step 1: Student Information Form */}
-      {currentStep === 1 && (
-        <div className="auth-card">
-          <div className="auth-header">
-            <h1>Career Fair Registration</h1>
-            <p>Join our career fair and connect with top companies</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="auth-form">
-            <div className="form-row">
-              <div className="form-group">
-                <label>First Name *</label>
-                <input
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleInputChange}
-                  className={`form-input ${errors.firstName ? 'error' : ''}`}
-                />
-                {errors.firstName && (
-                  <span className="field-error">{errors.firstName}</span>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Last Name *</label>
-                <input
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleInputChange}
-                  className={`form-input ${errors.lastName ? 'error' : ''}`}
-                />
-                {errors.lastName && (
-                  <span className="field-error">{errors.lastName}</span>
-                )}
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group">
-                <label>Email Address *</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className={`form-input ${errors.email ? 'error' : ''}`}
-                />
-                {errors.email && (
-                  <span className="field-error">{errors.email}</span>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Phone Number *</label>
-                <input
-                  type="tel"
-                  name="phoneNumber"
-                  value={formData.phoneNumber}
-                  onChange={handleInputChange}
-                  placeholder="+1 (555) 123-4567"
-                  className={`form-input ${errors.phoneNumber ? 'error' : ''}`}
-                />
-                {errors.phoneNumber && (
-                  <span className="field-error">{errors.phoneNumber}</span>
-                )}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Field of Study *</label>
-              <select
-                name="fieldOfStudy"
-                value={formData.fieldOfStudy}
-                onChange={handleInputChange}
-                className={`form-input ${errors.fieldOfStudy ? 'error' : ''}`}
-              >
-                <option value="">Select your field of study</option>
-                {fieldsOfStudy.map((field, index) => (
-                  <option key={index} value={field}>{field}</option>
-                ))}
-              </select>
-              {errors.fieldOfStudy && (
-                <span className="field-error">{errors.fieldOfStudy}</span>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label>Why do you want to join our career fair? *</label>
-              <textarea
-                name="motivation"
-                value={formData.motivation}
-                onChange={handleInputChange}
-                rows="4"
-                placeholder="Tell us about your career goals and what you hope to achieve..."
-                className={`form-input ${errors.motivation ? 'error' : ''}`}
-              />
-              {errors.motivation && (
-                <span className="field-error">{errors.motivation}</span>
-              )}
-            </div>
-
-            <button type="submit" className="btn btn-primary btn-full">
-              Continue to Company Selection
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* Step 2: Company Selection and Appointment Booking */}
-      {currentStep === 2 && (
-        <div className="auth-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-            <div className="auth-header" style={{ textAlign: 'left', marginBottom: '0' }}>
-              <h2>Select Companies & Book Appointments</h2>
-              <p>Choose companies you're interested in and schedule your appointments</p>
-            </div>
-            <button
-              onClick={() => setCurrentStep(1)}
-              className="btn btn-secondary"
-            >
-              Back to Form
-            </button>
-          </div>
-
-          {/* Date Selection */}
-{/* Career Fair Date Display */}
-<div className="form-group">
-  <label>Career Fair Date</label>
-  <div className="form-input" style={{ 
-    backgroundColor: '#f8f9fa', 
-    border: '2px solid #28a745',
-    fontWeight: 'bold',
-    color: '#28a745'
-  }}>
-    {formatDate('2025-11-26')} - Wednesday, November 26, 2025
-  </div>
-</div>
-          {selectedDate && (
-            <>
-              {/* Loading Indicator */}
-              {loading && (
-                <div className="loading-container">
-                  <div className="spinner"></div>
-                  <div className="loading-text">Loading available time slots...</div>
-                </div>
-              )}
-
-              {/* Company Selection */}
-              {!loading && companies.length > 0 && (
-                <div style={{ marginBottom: '30px' }}>
-                  <h3 style={{ marginBottom: '20px' }}>Available Companies</h3>
-                  <div className="features-grid">
-                    {companies.map(company => {
-                      const isSelected = selectedCompanies.find(c => c._id === company._id);
-                      return (
-                        <div
-                          key={company._id}
-                          onClick={() => handleCompanySelect(company)}
-                          className={`feature-card ${isSelected ? 'selected' : ''}`}
-                          style={{
-                            cursor: 'pointer',
-                            border: isSelected ? '2px solid #f29b20' : '1px solid #e0e0e0',
-                            backgroundColor: isSelected ? 'rgba(242, 155, 32, 0.05)' : '#ffffff'
-                          }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                            <h4 style={{ margin: 0 }}>{company.name}</h4>
-                            <div style={{
-                              width: '20px',
-                              height: '20px',
-                              borderRadius: '50%',
-                              backgroundColor: isSelected ? '#f29b20' : 'transparent',
-                              border: '2px solid #f29b20',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}>
-                              {isSelected && <span style={{ color: 'white', fontSize: '12px' }}>✓</span>}
-                            </div>
-                          </div>
-                          <p style={{ margin: '5px 0', color: '#666', fontSize: '0.9rem' }}>
-                            Industry: {company.industry}
-                          </p>
-                          <p style={{ margin: '10px 0 0 0', fontSize: '0.9rem' }}>
-                            <strong>Positions:</strong> {company.positions.join(', ')}
-                          </p>
-                          {company.description && (
-                            <p style={{ margin: '10px 0 0 0', color: '#666', fontSize: '0.85rem' }}>
-                              {company.description}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Time Slot Booking for Selected Companies */}
-              {selectedCompanies.length > 0 && timeSlots.length > 0 && (
-                <div style={{ marginBottom: '30px' }}>
-                  <h3 style={{ marginBottom: '20px' }}>
-                    Book Time Slots for {formatDate(selectedDate)}
-                  </h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-                    {selectedCompanies.map(company => (
-                      <div key={company._id} className="dashboard-card">
-                        <h4 style={{ marginBottom: '15px' }}>{company.name}</h4>
-                        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
-                          {timeSlots.map(timeSlot => {
-                            const isBooked = bookedSlots[company._id]?.[selectedDate] === timeSlot;
-                            const isAvailableForCompany = availability[company._id]?.[timeSlot];
-                            const isUsedByStudent = usedTimeSlots.has(timeSlot) && !isBooked;
-                            const isDisabled = !isAvailableForCompany || isUsedByStudent;
-                            return (
-                              <button
-                                key={timeSlot}
-                                onClick={() => !isDisabled && handleTimeSlotSelect(company._id, timeSlot)}
-                                disabled={isDisabled}
-                                className={`btn btn-sm ${isBooked ? 'btn-success' : isDisabled ? 'btn-danger' : 'btn-secondary'}`}
-                                style={{
-                                  opacity: isDisabled ? 0.6 : 1,
-                                  fontSize: '0.8rem',
-                                  padding: '8px 4px'
-                                }}
-                              >
-                                {timeSlot}
-                                {isBooked && ' ✓'}
-                                {isDisabled && !isBooked && ' ✗'}
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {bookedSlots[company._id]?.[selectedDate] && (
-                          <p style={{ 
-                            marginTop: '10px', 
-                            color: '#28a745', 
-                            fontWeight: '500',
-                            fontSize: '0.9rem'
-                          }}>
-                            ✓ Booked: {bookedSlots[company._id][selectedDate]}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Summary and Submit */}
-              {Object.keys(bookedSlots).length > 0 && (
-                <div className="dashboard-card" style={{ backgroundColor: 'rgba(242, 155, 32, 0.1)', marginBottom: '20px' }}>
-                  <h3 style={{ marginBottom: '15px' }}>Appointment Summary</h3>
-                  <div className="profile-info">
-                    <div className="profile-item">
-                      <strong>Student:</strong>
-                      <span>{formData.firstName} {formData.lastName}</span>
-                    </div>
-                    <div className="profile-item">
-                      <strong>Email:</strong>
-                      <span>{formData.email}</span>
-                    </div>
-                    <div className="profile-item">
-                      <strong>Date:</strong>
-                      <span>{formatDate(selectedDate)}</span>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: '15px' }}>
-                    <strong>Scheduled Appointments:</strong>
-                    <div className="activity-list" style={{ marginTop: '10px' }}>
-                      {Object.entries(bookedSlots).map(([companyId, dates]) => {
-                        const company = companies.find(c => c._id === companyId);
-                        const timeSlot = dates[selectedDate];
-                        return timeSlot ? (
-                          <div key={companyId} className="activity-item">
-                            <div className="activity-icon">🏢</div>
-                            <div>
-                              <div className="activity-title">{company?.name}</div>
-                              <div className="activity-time">{timeSlot}</div>
-                            </div>
-                          </div>
-                        ) : null;
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div style={{ textAlign: 'center' }}>
-                <button
-                  onClick={handleBookingSubmit}
-                  disabled={Object.keys(bookedSlots).length === 0 || loading}
-                  className={`btn ${Object.keys(bookedSlots).length > 0 && !loading ? 'btn-primary' : ''}`}
-                  style={{
-                    padding: '16px 32px',
-                    fontSize: '1.1rem',
-                    backgroundColor: Object.keys(bookedSlots).length > 0 && !loading ? '#28a745' : '#6c757d',
-                    cursor: Object.keys(bookedSlots).length > 0 && !loading ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  {loading ? 'Submitting...' :
-                   Object.keys(bookedSlots).length > 0 
-                    ? `Confirm ${Object.keys(bookedSlots).length} Appointment${Object.keys(bookedSlots).length > 1 ? 's' : ''}` 
-                    : 'Select at least one time slot'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Instructions Panel */}
-      <div className="about-section" style={{ marginTop: '30px' }}>
-        <h3 style={{ marginBottom: '15px', display: 'flex', alignItems: 'center' }}>
-          <span style={{ marginRight: '10px', fontSize: '1.2rem' }}>ℹ️</span>
-          How to Use This Form
-        </h3>
-        <div className="tech-grid">
-          <div className="tech-item">
-            <h4 style={{ color: '#f29b20', marginBottom: '8px' }}>Step 1: Personal Information</h4>
-            <ul style={{ paddingLeft: '20px', textAlign: 'left' }}>
-              <li>Fill in your personal details</li>
-              <li>Select your field of study</li>
-              <li>Describe your motivation</li>
-            </ul>
-          </div>
-          <div className="tech-item">
-            <h4 style={{ color: '#f29b20', marginBottom: '8px' }}>Step 2: Company Selection</h4>
-            <ul style={{ paddingLeft: '20px', textAlign: 'left' }}>
-              <li>Choose your preferred date</li>
-              <li>Select companies you want to meet</li>
-              <li>Book time slots for each company</li>
-            </ul>
-          </div>
-          <div className="tech-item">
-            <h4 style={{ color: '#f29b20', marginBottom: '8px' }}>Important Rules</h4>
-            <ul style={{ paddingLeft: '20px', textAlign: 'left' }}>
-              <li>Each time slot is 15 minutes</li>
-              <li>You can't book overlapping times</li>
-              <li>One appointment per company per day</li>
-              <li>Real-time availability checking</li>
-            </ul>
-          </div>
-        </div>
+    <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+        <h1 style={{ color: '#f29b20', marginBottom: '10px' }}>Career Fair Registration</h1>
+        <p style={{ fontSize: '1.1em', color: '#666' }}>Join our career fair and connect with top companies</p>
       </div>
+
+      <form onSubmit={handleSubmit} style={{
+        background: 'white',
+        borderRadius: '12px',
+        padding: '40px',
+        boxShadow: '0 10px 40px rgba(242, 155, 32, 0.1)'
+      }}>
+        {error && (
+          <div style={{
+            padding: '15px 20px',
+            borderRadius: '6px',
+            marginBottom: '20px',
+            backgroundColor: '#f8d7da',
+            color: '#721c24',
+            border: '1px solid #f5c6cb'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div style={{
+            padding: '15px 20px',
+            borderRadius: '6px',
+            marginBottom: '20px',
+            backgroundColor: '#d4edda',
+            color: '#155724',
+            border: '1px solid #c3e6cb'
+          }}>
+            ✅ Registration successful! Check your email for confirmation.
+          </div>
+        )}
+
+        {/* Student Information Section */}
+        <section style={{ marginBottom: '40px' }}>
+          <h2 style={{
+            fontSize: '1.5em',
+            color: '#333',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f29b20'
+          }}>
+            📋 Your Information
+          </h2>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '20px',
+            marginBottom: '20px'
+          }}>
+            <div>
+              <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block', color: '#333' }}>
+                First Name *
+              </label>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleInputChange}
+                required
+                maxLength="50"
+                placeholder="Enter your first name"
+                style={{
+                  padding: '12px',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '6px',
+                  fontSize: '1em',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block', color: '#333' }}>
+                Last Name *
+              </label>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleInputChange}
+                required
+                maxLength="50"
+                placeholder="Enter your last name"
+                style={{
+                  padding: '12px',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '6px',
+                  fontSize: '1em',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '20px',
+            marginBottom: '20px'
+          }}>
+            <div>
+              <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block', color: '#333' }}>
+                Email *
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
+                placeholder="your.email@example.com"
+                style={{
+                  padding: '12px',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '6px',
+                  fontSize: '1em',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block', color: '#333' }}>
+                Phone Number *
+              </label>
+              <input
+                type="tel"
+                name="phoneNumber"
+                value={formData.phoneNumber}
+                onChange={handleInputChange}
+                required
+                placeholder="+43 123 456789"
+                style={{
+                  padding: '12px',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '6px',
+                  fontSize: '1em',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block', color: '#333' }}>
+              Field of Study *
+            </label>
+            <select
+              name="fieldOfStudy"
+              value={formData.fieldOfStudy}
+              onChange={handleInputChange}
+              required
+              style={{
+                padding: '12px',
+                border: '2px solid #e0e0e0',
+                borderRadius: '6px',
+                fontSize: '1em',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}
+            >
+              <option value="">Select your field of study</option>
+              {fieldOfStudyOptions.map(option => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block', color: '#333' }}>
+              Motivation *
+            </label>
+            <textarea
+              name="motivation"
+              value={formData.motivation}
+              onChange={handleInputChange}
+              required
+              placeholder="Tell us why you want to attend this career fair..."
+              rows="4"
+              style={{
+                padding: '12px',
+                border: '2px solid #e0e0e0',
+                borderRadius: '6px',
+                fontSize: '1em',
+                width: '100%',
+                boxSizing: 'border-box',
+                fontFamily: 'inherit',
+                resize: 'vertical'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block', color: '#333' }}>
+              Upload CV (PDF, DOC, DOCX - Max 2MB)
+            </label>
+            <input
+              id="cvInput"
+              type="file"
+              onChange={handleCVChange}
+              accept=".pdf,.doc,.docx"
+              style={{
+                padding: '12px',
+                border: '2px solid #e0e0e0',
+                borderRadius: '6px',
+                fontSize: '1em',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}
+            />
+            {formData.cvFileName && (
+              <small style={{ color: '#28a745', marginTop: '5px', display: 'block' }}>
+                ✅ File selected: {formData.cvFileName}
+              </small>
+            )}
+          </div>
+        </section>
+
+        {/* Company Selection Section */}
+        <section style={{ marginBottom: '40px' }}>
+          <h2 style={{
+            fontSize: '1.5em',
+            color: '#333',
+            marginBottom: '20px',
+            paddingBottom: '10px',
+            borderBottom: '2px solid #f29b20'
+          }}>
+            🏢 Select Companies
+          </h2>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+            gap: '20px',
+            marginBottom: '30px'
+          }}>
+            {companies.map(company => (
+              <div key={company._id} style={{
+                background: selectedCompanies[company._id]?.selected ? '#fffbf0' : '#f8f9fa',
+                border: selectedCompanies[company._id]?.selected ? '2px solid #f29b20' : '2px solid #e0e0e0',
+                borderRadius: '8px',
+                padding: '20px',
+                transition: 'all 0.3s',
+                cursor: company.specialRules?.bookingAvailable ? 'pointer' : 'not-allowed',
+                opacity: company.specialRules?.bookingAvailable ? 1 : 0.7
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  marginBottom: '15px'
+                }}>
+                  <input
+                    type="checkbox"
+                    id={`company-${company._id}`}
+                    checked={selectedCompanies[company._id]?.selected || false}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        handleCompanySelect(company._id);
+                      } else {
+                        handleCompanyDeselect(company._id);
+                      }
+                    }}
+                    disabled={!company.specialRules?.bookingAvailable}
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      marginTop: '2px',
+                      cursor: 'pointer',
+                      accentColor: '#f29b20'
+                    }}
+                  />
+                  <label htmlFor={`company-${company._id}`} style={{ cursor: 'pointer', flex: 1 }}>
+                    <h3 style={{ margin: 0, fontSize: '1.2em', color: '#333' }}>{company.name}</h3>
+                  </label>
+                </div>
+
+                <div style={{ marginBottom: '15px', fontSize: '0.9em' }}>
+                  <p style={{ margin: '5px 0', color: '#666' }}>
+                    <strong>Industry:</strong> {company.industry}
+                  </p>
+                  <p style={{ margin: '5px 0', color: '#666' }}>
+                    <strong>Package:</strong>{' '}
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.85em',
+                      fontWeight: '600',
+                      backgroundColor: company.packageType === 'Platinum' ? '#c0c0c0' : 
+                                      company.packageType === 'Gold' ? '#ffc107' : '#e8e8e8',
+                      color: company.packageType === 'Gold' ? '#333' : 'white'
+                    }}>
+                      {company.packageType}
+                    </span>
+                  </p>
+                  {company.description && (
+                    <p style={{
+                      color: '#888',
+                      fontStyle: 'italic',
+                      marginTop: '10px',
+                      paddingTop: '10px',
+                      borderTop: '1px solid #ddd'
+                    }}>
+                      {company.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Special Rules */}
+                {selectedCompanies[company._id]?.selected && (
+                  <div style={{ marginBottom: '15px' }}>
+                    {/* ÖBB: German Requirement */}
+                    {company.specialRules?.germanRequired && (
+                      <div style={{
+                        background: '#fff3cd',
+                        borderLeft: '4px solid #ff9800',
+                        padding: '15px',
+                        borderRadius: '4px',
+                        marginBottom: '15px'
+                      }}>
+                        <strong style={{ display: 'block', marginBottom: '8px', color: '#333' }}>
+                          ⚠️ German Requirement:
+                        </strong>
+                        <p style={{ margin: '8px 0', color: '#666', fontSize: '0.9em' }}>
+                          This company requires B2 level German language skills.
+                        </p>
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          margin: '8px 0'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedCompanies[company._id]?.germanLanguageConfirmed || false}
+                            onChange={(e) => handleCompanyFieldChange(company._id, 'germanLanguageConfirmed', e.target.checked)}
+                            style={{ cursor: 'pointer', accentColor: '#f29b20' }}
+                          />
+                          I confirm B2 level German language proficiency
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Netconomy: Internship Interest */}
+                    {company.specialRules?.internshipVisa && (
+                      <div style={{
+                        background: '#d1ecf1',
+                        borderLeft: '4px solid #17a2b8',
+                        padding: '15px',
+                        borderRadius: '4px',
+                        marginBottom: '15px'
+                      }}>
+                        <strong style={{ display: 'block', marginBottom: '8px', color: '#333' }}>
+                          🎓 Internship Opportunity:
+                        </strong>
+                        <p style={{ margin: '8px 0', color: '#666', fontSize: '0.9em' }}>
+                          Are you interested in an internship? Do you have a valid visa for employment?
+                        </p>
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          margin: '8px 0'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedCompanies[company._id]?.internshipInterest || false}
+                            onChange={(e) => handleCompanyFieldChange(company._id, 'internshipInterest', e.target.checked)}
+                            style={{ cursor: 'pointer', accentColor: '#f29b20' }}
+                          />
+                          I am interested in an internship
+                        </label>
+                        <label style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: 'pointer',
+                          margin: '8px 0'
+                        }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedCompanies[company._id]?.hasValidVisa || false}
+                            onChange={(e) => handleCompanyFieldChange(company._id, 'hasValidVisa', e.target.checked)}
+                            style={{ cursor: 'pointer', accentColor: '#f29b20' }}
+                          />
+                          I have a valid visa for full-time employment (38.5 hrs/week)
+                        </label>
+                        <div style={{ marginTop: '10px' }}>
+                          <a href="https://drive.google.com/drive/folders/1FZnDU1Ps9H6PTsZA0MolcpL_I1twHovn?usp=sharing" target="_blank" rel="noopener noreferrer" style={{
+                            color: '#007bff',
+                            textDecoration: 'none',
+                            fontWeight: '600'
+                          }}>
+                            📄 Check out internship listings
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Timeslot Selection */}
+                {selectedCompanies[company._id]?.selected && availableSlots[company._id] && availableSlots[company._id].length > 0 && (
+                  <div style={{ marginBottom: '15px', paddingTop: '15px', borderTop: '1px solid #ddd' }}>
+                    <label style={{ fontWeight: '600', marginBottom: '10px', display: 'block', color: '#333' }}>
+                      Select a time slot:
+                    </label>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))',
+                      gap: '8px'
+                    }}>
+                      {availableSlots[company._id].map((slot, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => handleTimeSlotSelect(company._id, slot.timeSlot)}
+                          disabled={!slot.available || slot.conflict}
+                          style={{
+                            padding: '10px',
+                            border: selectedCompanies[company._id]?.timeSlot === slot.timeSlot ? '2px solid #f29b20' : '2px solid #e0e0e0',
+                            background: selectedCompanies[company._id]?.timeSlot === slot.timeSlot ? '#f29b20' : 'white',
+                            color: selectedCompanies[company._id]?.timeSlot === slot.timeSlot ? 'white' : '#333',
+                            borderRadius: '6px',
+                            cursor: !slot.available || slot.conflict ? 'not-allowed' : 'pointer',
+                            fontSize: '0.9em',
+                            fontWeight: '500',
+                            opacity: !slot.available || slot.conflict ? 0.5 : 1,
+                            backgroundColor: !slot.available || slot.conflict ? '#f0f0f0' : (selectedCompanies[company._id]?.timeSlot === slot.timeSlot ? '#f29b20' : 'white')
+                          }}
+                          title={slot.conflict ? 'Conflict with another appointment' : slot.available ? slot.timeSlot : 'Fully booked'}
+                        >
+                          {slot.timeSlot}
+                          {slot.conflict && <div style={{ fontSize: '0.7em' }}>Conflict</div>}
+                          {!slot.available && !slot.conflict && <div style={{ fontSize: '0.7em' }}>Booked</div>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!company.specialRules?.bookingAvailable && (
+                  <div style={{ padding: '10px', background: '#fff3cd', borderRadius: '4px', marginTop: '10px', color: '#856404' }}>
+                    <strong>⏳ Booking Not Available</strong>
+                    <p style={{ margin: '5px 0', fontSize: '0.9em' }}>This company's bookings are not available at the moment. Please check back later.</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Submit Button */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          gap: '15px',
+          marginTop: '40px',
+          paddingTop: '30px',
+          borderTop: '2px solid #f0f0f0'
+        }}>
+          <button
+            type="submit"
+            disabled={submitting}
+            style={{
+              padding: '14px 40px',
+              background: submitting ? '#ccc' : 'linear-gradient(135deg, #f29b20 0%, #e68a1c 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '1.05em',
+              fontWeight: '600',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}
+          >
+            {submitting ? 'Registering...' : 'Register for Career Fair'}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

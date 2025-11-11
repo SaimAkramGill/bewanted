@@ -7,7 +7,7 @@ const Home = () => {
       <section className="hero">
         <div className="container">
           <div className="hero-content">
-            <h1>Welcome to beWanted</h1>
+            <h1>Welcome to beWANTED</h1>
             <p className="hero-subtitle">
               Das persönliche Karriere-Event
             </p>
@@ -88,19 +88,19 @@ const Home = () => {
       className="company-logo"
     />
               </div>
-              <h3>SSI SCHÄFER</h3>
-              <p>SSI SCHÄFER is a global leader in modular warehouse and logistics solutions, shaping the future of intralogistics with innovative technologies across six continents.</p>
+              <h3>MJP Ziviltechniker</h3>
+              <p>MJP is an interdisciplinary Austrian engineering consultancy providing comprehensive "one-stop shop" solutions for ground engineering, geology, and water management, addressing complex challenges in construction, natural hazards, and ecology.</p>
             </div>
             
             <div className="feature-card">
               <div className="feature-icon">
                 <img 
-      src="/logos/netConomy-logo.png" 
+      src="/logos/NCLogo.png" 
       alt="Netconomy Logo" 
       className="company-logo"
     />
               </div>
-              <h3>Netconomy</h3>
+              <h3>NETCONOMY</h3>
               <p>From designing your first agile digital strategy, and choosing the right solutions for you, all the way to building and optimizing amazing digital platforms – we are here to help you transform your business, today.</p>
             </div>
           </div>
@@ -116,8 +116,8 @@ const Home = () => {
               <h3>Event Details</h3>
               <p>
                 <strong>Date:</strong> November 26, 2025<br />
-                <strong>Time:</strong> 8:30 AM - 4:30 PM<br />
-                <strong>Location:</strong> Infeldgasse 13B
+                <strong>Time:</strong> 8:00 - 17:30<br />
+                <strong>Location:</strong> Infeldgasse 13
               </p>
             </div>
             <Link to="/career-fair" className="btn btn-primary">
