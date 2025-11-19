@@ -75,22 +75,7 @@ const studentEmailTemplate = `
                     <div class="info-label">Field of Study:</div>
                     <div class="info-value">{{fieldOfStudy}}</div>
                 </div>
-                <div class="info-item">
-                    <div class="info-label">Total Appointments:</div>
-                    <div class="info-value">{{appointmentCount}}</div>
-                </div>
             </div>
-
-            <h3>📅 Your Scheduled Appointments:</h3>
-            {{#each appointments}}
-            <div class="appointment-card">
-                <div class="company-name">{{company.name}}</div>
-                <div class="appointment-details">
-                    <strong>📅 Date:</strong> {{formatDate date}}<br>
-                    <strong>🕐 Time:</strong> {{timeSlot}}<br>
-                    <strong>🏢 Industry:</strong> {{company.industry}}<br>
-                    <strong>💼 Positions:</strong> {{#if company.positions}}{{join company.positions ", "}}{{else}}N/A{{/if}}
-                </div>
             </div>
             {{/each}}
 
@@ -112,7 +97,7 @@ const studentEmailTemplate = `
         
         <div class="footer">
             <p>Best regards,<br><strong>The beWanted Team</strong></p>
-            <p>📧 admin@bewanted.com | 📱 +1 (555) 123-4567</p>
+            <p>📧 graz@bewanted.com</p>
             <p>© 2025 beWanted. All rights reserved.</p>
         </div>
     </div>
@@ -145,13 +130,13 @@ const adminEmailTemplate = `
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔔 New Career Fair Registration</h1>
+            <h1> New Career Fair Registration</h1>
             <p>A new student has registered for the career fair</p>
         </div>
         
         <div class="content">
             <div class="student-info">
-                <h3>👤 Student Information:</h3>
+                <h3>Student Information:</h3>
                 <p><strong>Name:</strong> {{firstName}} {{lastName}}</p>
                 <p><strong>Email:</strong> {{email}}</p>
                 <p><strong>Phone:</strong> {{phoneNumber}}</p>
@@ -161,7 +146,7 @@ const adminEmailTemplate = `
                 <p><strong>Registration Time:</strong> {{registrationTime}}</p>
             </div>
 
-            <h3>📅 Booked Appointments:</h3>
+            <h3> Booked Appointments:</h3>
             {{#each appointments}}
             <div class="appointment-card">
                 <div class="company-name">{{company.name}}</div>

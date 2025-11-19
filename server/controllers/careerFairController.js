@@ -246,6 +246,14 @@ const registerStudent = async (req, res) => {
           throw new Error('Timeslot is fully booked');
         }
 
+        // ✅ Parse checkbox values from appointment object
+        const germanLanguageConfirmed = apt.germanLanguageConfirmed === true || 
+                                       apt.germanLanguageConfirmed === 'true';
+        const internshipInterest = apt.internshipInterest === true || 
+                                   apt.internshipInterest === 'true';
+        const hasValidVisa = apt.hasValidVisa === true || 
+                            apt.hasValidVisa === 'true';
+
         // Create appointment
         const newAppointment = new Appointment({
           studentInfo: {
@@ -257,14 +265,15 @@ const registerStudent = async (req, res) => {
             motivation: motivation.trim()
           },
           company: apt.companyId,
+          companyName: company.name, // ✅ Add company name
           date: new Date('2025-11-26'),
           timeSlot: apt.timeSlot,
           status: 'scheduled',
           cvPath: req.file?.path || null,
           cvFileName: req.file?.originalname || null,
-          germanLanguageConfirmed: req.body.germanLanguageConfirmed === 'true' || false,
-          internshipInterest: req.body.internshipInterest === 'true' || false,
-          hasValidVisa: req.body.hasValidVisa === 'true' || false
+          germanLanguageConfirmed: germanLanguageConfirmed,
+          internshipInterest: internshipInterest,
+          hasValidVisa: hasValidVisa
         });
 
         console.log('Saving appointment...');
