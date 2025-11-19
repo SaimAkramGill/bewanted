@@ -190,7 +190,10 @@ const CareerFairForm = () => {
       .filter(([, data]) => data.timeSlot)
       .map(([companyId, data]) => ({
         companyId,
-        timeSlot: data.timeSlot
+        timeSlot: data.timeSlot,
+        germanLanguageConfirmed: data.germanLanguageConfirmed || false,
+        internshipInterest: data.internshipInterest || false,
+        hasValidVisa: data.hasValidVisa || false
       }));
 
     if (appointments.length === 0) {
@@ -198,25 +201,10 @@ const CareerFairForm = () => {
       return;
     }
 
-    // Validate special requirements
-    for (const [companyId, data] of Object.entries(selectedCompanies)) {
-      if (!data.timeSlot) continue;
+    // ✅ Special requirements checkboxes are displayed but NOT enforced
+    // Data is collected and stored for company reference
+    // Users can book regardless of checkbox status
 
-      const company = companies.find(c => c._id === companyId);
-      if (!company) continue;
-
-      // Check German requirement
-      if (company.specialRules?.germanRequired && !data.germanLanguageConfirmed) {
-        setError(`${company.name} requires confirmation of B2 level German`);
-        return;
-      }
-
-      // Check internship requirement
-      if (company.specialRules?.internshipVisa && (!data.internshipInterest || !data.hasValidVisa)) {
-        setError(`${company.name} requires confirmation of internship interest and valid visa`);
-        return;
-      }
-    }
 
     try {
       setSubmitting(true);
