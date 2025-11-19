@@ -117,7 +117,7 @@ const companies = [
     specialRules: {
       germanRequired: false,
       internshipVisa: false,
-      limitedBookings: false,
+      limitedBookings: true,
       usesGoldTimeslots: false,
       bookingAvailable: false // SPECIAL RULE: NOT ACTIVATED YET - waiting for valid contract
     },

@@ -83,8 +83,8 @@ const Home = () => {
             <div className="feature-card">
               <div className="feature-icon">
                 <img 
-      src="/logos/Logo_SSI.png" 
-      alt="SSI SCHÄFER Logo" 
+      src="/logos/MJP.svg" 
+      alt="MJP Logo" 
       className="company-logo"
     />
               </div>
@@ -104,6 +104,32 @@ const Home = () => {
               <p>From designing your first agile digital strategy, and choosing the right solutions for you, all the way to building and optimizing amazing digital platforms – we are here to help you transform your business, today.</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="sponsors">
+        <div className="container">
+          <div className="sponsors-divider top"></div>
+          <div className="sponsors-content">
+            <h2>Our Sponsors</h2>
+            <div className="sponsors-grid">
+              <div className="sponsor-logo">
+                <img 
+                  src="/logos/RedBull.png" 
+                  alt="Red Bull Logo" 
+                  className="sponsor-img"
+                />
+              </div>
+              <div className="sponsor-logo">
+                <img 
+                  src="/logos/RoteRakete.png" 
+                  alt="Rote Rakete Logo" 
+                  className="sponsor-img"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="sponsors-divider bottom"></div>
         </div>
       </section>
 
